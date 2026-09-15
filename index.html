@@ -169,6 +169,16 @@ h2.sec .n{font-size:12px;font-weight:600;color:var(--ink3);background:var(--bg);
   .navbar .inner{padding:8px 12px}
   .btn{padding:9px 14px}
 }
+.rngcard{border:1.5px solid #c3c7f5;background:linear-gradient(180deg,#fbfbff,#fff)}
+.rnghead{font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px}
+.rngpick{display:flex;gap:8px}
+.toolbar{display:flex;gap:10px;margin:6px 0 14px;flex-wrap:wrap}
+.toolbar input{flex:1;min-width:160px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;font:inherit}
+.toolbar select{padding:9px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:#fff}
+.logitem{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px dashed var(--line);font-size:13px}
+.logitem:first-child{border-top:0}
+.logitem .score{font-weight:700;font-variant-numeric:tabular-nums}
+.logitem .ok{color:var(--ok)} .logitem .bad{color:var(--bad)}
 </style>
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -729,9 +739,9 @@ const store = loadStore();
 function loadStore(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if(raw) return Object.assign({records:{},wrong:{},exams:[],imported:[],session:null}, JSON.parse(raw));
+    if(raw) return Object.assign({records:{},wrong:{},exams:[],imported:[],session:null,randomLogs:[]}, JSON.parse(raw));
   }catch(e){}
-  return {records:{},wrong:{},exams:[],imported:[],session:null};
+  return {records:{},wrong:{},exams:[],imported:[],session:null,randomLogs:[]};
 }
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(store)); return true; }catch(e){ return false; } }
 function resetAll(){
@@ -793,6 +803,7 @@ function route(v){
   else if(v.name==='examResult') renderExamResult();
   else if(v.name==='wrong') renderWrong();
   else if(v.name==='import') renderImport();
+  else if(v.name==='randomResult') renderRandomResult();
   window.scrollTo({top:0});
 }
 function resumePractice(){
@@ -822,26 +833,12 @@ function renderHome(){
       </div>`;
     return;
   }
-  const rows = allPapers().map(p=>{
-    const s = paperStats(p);
-    return `<div class="card paper">
-      <div class="info">
-        <h3>${esc(p.name)} ${isBuiltin(p.id)?'':'<span class="pill">导入</span>'}</h3>
-        <div class="dim">共 ${s.total} 题 · 来源 ${esc(p.source)}</div>
-        <div class="metrics">
-          <div class="metric"><b>${s.done}<span class="dim">/${s.total}</span></b><span>已做</span></div>
-          <div class="metric"><b style="color:var(--ok)">${s.acc}%</b><span>正确率</span></div>
-          <div class="metric"><b style="color:${s.wrongBook?'var(--bad)':'var(--ink3)'}">${s.wrongBook}</b><span>在错题本</span></div>
-        </div>
-        <div class="bar"><i style="width:${s.total? s.done/s.total*100:0}%"></i></div>
-      </div>
-      <div class="btnrow" style="flex-direction:column">
-        <button class="btn p" onclick="startPractice('${p.id}')">练习模式</button>
-        <button class="btn g" onclick="route({name:'examStart',paperId:'${p.id}'})">考试模式</button>
-        ${isBuiltin(p.id)?'':`<button class="btn d sm" onclick="removeImported('${p.id}')">移除</button>`}
-      </div>
-    </div>`;
-  }).join('');
+  const totalQ = allPapers().reduce((a,p)=>a+p.questions.length,0);
+  let done=0, right=0;
+  allPapers().forEach(p=>p.questions.forEach(q=>{ const r=store.records[qkey(p.id,q.no)]; if(r){ done++; if(r.correct) right++; } }));
+  const acc = done? Math.round(right/done*100):0;
+  const wq = totalWrong();
+  const logs = store.randomLogs || [];
 
   const s = store.session;
   const resume = (s && s.mode==='practice' && getPaper(s.paperId))
@@ -853,18 +850,50 @@ function renderHome(){
           <button class="btn g sm" onclick="store.session=null;save();route({name:'home'})">忽略</button>
         </div></div>` : '';
 
-  const wq = totalWrong();
+  const recent = logs.length ? `
+    <div class="dim" style="margin-top:14px">最近随机练习：</div>
+    <div style="margin-top:2px">${recentLogsHtml(logs.slice(0,3))}</div>` : '';
+
   $('#app').innerHTML = `
     <div class="hero"><h1>CDGA 答题系统</h1>
-      <div class="muted">共 ${allPapers().length} 套试卷 / ${allPapers().reduce((a,p)=>a+p.questions.length,0)} 道题 · 数据存在本机浏览器，不上传</div></div>
+      <div class="muted">共 ${allPapers().length} 套试卷 / ${totalQ} 道题 · 数据存在本机浏览器，不上传</div></div>
     ${resume}
-    <div class="tabs">
+    <div class="card rngcard">
+      <div class="rnghead">🎲 随机练习</div>
+      <div class="muted">从全部 ${totalQ} 道题里随机抽取，专练薄弱点</div>
+      <div class="rngpick" style="margin-top:14px">
+        <button class="chip ${rngN===5?'on':''}" onclick="setRng(5)">5 题</button>
+        <button class="chip ${rngN===10?'on':''}" onclick="setRng(10)">10 题</button>
+        <button class="chip ${rngN===20?'on':''}" onclick="setRng(20)">20 题</button>
+      </div>
+      <button class="btn p" style="margin-top:14px;width:100%" onclick="startRandom(rngN)">开始随机练习 →</button>
+      ${recent}
+    </div>
+
+    <div class="stats" style="margin:18px 0">
+      <div class="stat"><b>${done}</b><span>已作答</span></div>
+      <div class="stat"><b>${acc}%</b><span>总正确率</span></div>
+      <div class="stat"><b style="color:${wq?'var(--bad)':'var(--ink3)'}">${wq}</b><span>错题本</span></div>
+      <div class="stat"><b>${logs.length}</b><span>随机练习</span></div>
+    </div>
+
+    <h2 class="sec">试卷 <span class="n">${allPapers().length}</span></h2>
+    <div class="toolbar">
+      <input id="homeSearchInput" placeholder="搜索试卷名…" oninput="homeSearch(this.value)">
+      <select onchange="homeSort=this.value;renderPaperList()">
+        <option value="name"${homeSort==='name'?' selected':''}>按名称</option>
+        <option value="acc"${homeSort==='acc'?' selected':''}>按正确率</option>
+        <option value="done"${homeSort==='done'?' selected':''}>按进度</option>
+      </select>
+    </div>
+    <div id="paperList">${paperRows()}</div>
+
+    <div class="tabs" style="margin-top:18px">
       <button class="tab on">试卷</button>
-      <button class="tab" onclick="route({name:'wrong'})">错题本${wq? ' · '+wq : ''}</button>
+      <button class="tab" onclick="route({name:'wrong'})">错题本${wq?' · '+wq : ''}</button>
       <button class="tab" onclick="route({name:'import'})">导入试卷</button>
     </div>
-    ${rows}
-    <div style="text-align:center;margin-top:22px">
+    <div style="text-align:center;margin-top:16px">
       <button class="btn d sm" onclick="resetAll()">清空全部记录</button>
       <div class="dim" style="margin-top:10px">题库生成时间 ${esc(BANK.generatedAt)}</div>
     </div>`;
@@ -934,6 +963,8 @@ function renderPractice(){
 
   const head = view.from==='wrong'
     ? `<button class="btn g sm" onclick="route({name:'wrong'})">← 错题本</button><span class="badge" style="background:#fdeaea;color:#dc2626">错题重做</span>`
+    : view.from==='random'
+    ? `<button class="btn g sm" onclick="abortRandom()">← 放弃</button><span class="badge" style="background:var(--primary-soft);color:var(--primary)">随机练习</span>`
     : `<button class="btn g sm" onclick="route({name:'home'})">← 返回</button>`;
 
   $('#app').innerHTML = `
@@ -951,6 +982,7 @@ function renderPractice(){
         <button class="btn p" onclick="practicePick(null)" ${sel.length?'':'disabled'}>确认答案（已选 ${sel.length} 项）</button>
       </div>`:''}
       ${tip}
+      ${view.from==='random' ? `<div class="btnrow" style="margin-top:16px"><button class="btn p" onclick="finishRandom()">完成练习，查看结果</button></div>` : ''}
     </div>`;
 
   $('#navbar').innerHTML = `<div class="navbar"><div class="inner">
@@ -1529,6 +1561,156 @@ document.addEventListener('keydown', e=>{
   }
 });
 $('#navHome').onclick = ()=>{ if(view.name==='exam' && !confirm('考试进行中，返回首页会放弃本次考试，确定吗？')) return; if(timer){clearInterval(timer);timer=null;} route({name:'home'}); };
+
+/* =====================================================================
+   首页 UI 状态（搜索 / 随机练习题数）
+   ===================================================================== */
+let rngN = 10;
+let homeQ = '';
+let homeSort = 'name';
+
+function setRng(n){
+  rngN = n;
+  document.querySelectorAll('.rngpick .chip').forEach(c=>c.classList.toggle('on', +c.dataset.n===n));
+}
+function homeSearch(v){ homeQ = (v||'').trim(); renderPaperList(); }
+
+function paperRows(){
+  let ps = allPapers().slice();
+  if(homeQ){
+    const q = homeQ.toLowerCase();
+    ps = ps.filter(p => p.name.toLowerCase().includes(q) || (p.source||'').toLowerCase().includes(q));
+  }
+  if(homeSort==='acc') ps.sort((a,b)=>paperStats(b).acc - paperStats(a).acc);
+  else if(homeSort==='done') ps.sort((a,b)=>paperStats(b).done - paperStats(a).done);
+  else ps.sort((a,b)=> a.name.localeCompare(b.name, 'zh'));
+  if(!ps.length) return '<div class="dim" style="padding:20px 2px">没有匹配的试卷。</div>';
+  return ps.map(p=>{
+    const s = paperStats(p);
+    return `<div class="card paper">
+      <div class="info">
+        <h3>${esc(p.name)} ${isBuiltin(p.id)?'':'<span class="pill">导入</span>'}</h3>
+        <div class="dim">共 ${s.total} 题 · 来源 ${esc(p.source)}</div>
+        <div class="metrics">
+          <div class="metric"><b>${s.done}<span class="dim">/${s.total}</span></b><span>已做</span></div>
+          <div class="metric"><b style="color:var(--ok)">${s.acc}%</b><span>正确率</span></div>
+          <div class="metric"><b style="color:${s.wrongBook?'var(--bad)':'var(--ink3)'}">${s.wrongBook}</b><span>在错题本</span></div>
+        </div>
+        <div class="bar"><i style="width:${s.total? s.done/s.total*100:0}%"></i></div>
+      </div>
+      <div class="btnrow" style="flex-direction:column">
+        <button class="btn p" onclick="startPractice('${p.id}')">练习模式</button>
+        <button class="btn g" onclick="route({name:'examStart',paperId:'${p.id}'})">考试模式</button>
+        ${isBuiltin(p.id)?'':`<button class="btn d sm" onclick="removeImported('${p.id}')">移除</button>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+function renderPaperList(){ const el=document.getElementById('paperList'); if(el) el.innerHTML = paperRows(); }
+
+function recentLogsHtml(logs){
+  return logs.map((log,i)=>{
+    const acc = log.total? Math.round(log.right/log.total*100):0;
+    const d = new Date(log.ts);
+    const ds = (d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    return `<div class="logitem">
+      <span class="score ${acc>=60?'ok':'bad'}">${acc}%</span>
+      <span class="muted">${log.right}/${log.total} 题 · 用时 ${fmtTime(log.usedSec)}</span>
+      <span class="dim">${ds}</span>
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn g sm" onclick="reviewLog(${i})">回顾</button>
+    </div>`;
+  }).join('');
+}
+function reviewLog(i){ const log = (store.randomLogs||[])[i]; if(log) route({name:'randomResult', result:log}); }
+
+/* =====================================================================
+   随机练习
+   ===================================================================== */
+function sampleAll(n){
+  const pool = [];
+  allPapers().forEach(p => p.questions.forEach(q => pool.push({pid:p.id, no:q.no})));
+  for(let i=pool.length-1; i>0; i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, Math.min(n, pool.length));
+}
+function startRandom(n){
+  const total = allPapers().reduce((a,p)=>a+p.questions.length,0);
+  n = Math.max(1, Math.min(total, (n|0) || rngN));
+  const list = sampleAll(n);
+  if(!list.length){ toast('题库为空'); return; }
+  route({name:'practice', from:'random', index:0, list, startTs:Date.now()});
+}
+function abortRandom(){
+  if(confirm('放弃本次随机练习？进度不会保存。')) route({name:'home'});
+}
+function finishRandom(){
+  const list = view.list;
+  let right=0, undone=0;
+  const items = list.map(it=>{
+    const k = qkey(it.pid, it.no);
+    const r = store.records[k];
+    if(!r){ undone++; return {pid:it.pid, no:it.no, picked:'', correct:false}; }
+    if(r.correct) right++;
+    return {pid:it.pid, no:it.no, picked:r.picked, correct:r.correct};
+  });
+  if(undone>0 && !confirm('还有 '+undone+' 题未作答，确定完成吗？')) return;
+  const usedSec = Math.round((Date.now() - (view.startTs||Date.now()))/1000);
+  const log = {ts:Date.now(), total:list.length, right, usedSec, items};
+  store.randomLogs = store.randomLogs || [];
+  store.randomLogs.unshift(log);
+  if(store.randomLogs.length>50) store.randomLogs = store.randomLogs.slice(0,50);
+  save();
+  route({name:'randomResult', result:log});
+}
+
+/* =====================================================================
+   随机练习结果 / 记录回顾
+   ===================================================================== */
+function renderRandomResult(){
+  const r = view.result;
+  const total = r.total||0, right = r.right||0;
+  const score = total? Math.round(right/total*100):0;
+  const passed = score>=60;
+  const wrongItems = (r.items||[]).filter(it=>!it.correct);
+
+  const wrongHtml = wrongItems.length ? wrongItems.map(it=>{
+    const p = getPaper(it.pid);
+    const q = p && p.questions.find(x=>x.no===it.no);
+    if(!q) return '';
+    return `<div class="item">
+      <div class="qh">${q.no}. ${esc(q.stem)}</div>
+      <div class="dim">${LETTERS.filter(L=>q.options[L]!==undefined).map(L=>esc(L)+'. '+esc(q.options[L])).join('　')}</div>
+      <div class="ansline">
+        <span>你的答案：<span class="${it.picked?'n':'dim'}">${it.picked?esc(it.picked):'未作答'}</span></span>
+        <span>正确答案：<span class="y">${esc(q.answer)}</span></span>
+      </div>
+      ${q.explain? `<div class="dim" style="margin-top:6px">解析：${esc(q.explain)}</div>`:''}
+    </div>`;
+  }).join('') : '<div class="empty"><div class="ico">🎉</div>全部答对，没有错题</div>';
+
+  $('#app').innerHTML = `
+    <div class="card score">
+      <div class="big ${passed?'pass':'fail'}">${score}</div>
+      <div class="sub">随机练习 · ${total} 题 ${passed?'· 及格':''}</div>
+      <div class="stats">
+        <div class="stat"><b>${right}/${total}</b><span>答对</span></div>
+        <div class="stat"><b>${score}%</b><span>正确率</span></div>
+        <div class="stat"><b>${fmtTime(r.usedSec||0)}</b><span>用时</span></div>
+        <div class="stat"><b style="color:var(--bad)">${wrongItems.length}</b><span>错题</span></div>
+      </div>
+    </div>
+    <div class="btnrow" style="margin:14px 0 20px">
+      <button class="btn p" onclick="startRandom(${total})">再练 ${total} 题</button>
+      <button class="btn g" onclick="route({name:'home'})">返回首页</button>
+    </div>
+    <div class="card review">
+      <h2 class="sec">错题回顾 <span class="n">${wrongItems.length}</span></h2>
+      ${wrongHtml}
+    </div>`;
+}
 
 /* 启动 */
 route({name:'home'});
