@@ -172,6 +172,7 @@ h2.sec .n{font-size:12px;font-weight:600;color:var(--ink3);background:var(--bg);
 .rngcard{border:1.5px solid #c3c7f5;background:linear-gradient(180deg,#fbfbff,#fff)}
 .rnghead{font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px}
 .rngpick{display:flex;gap:8px}
+.memopick .chip.on{background:#d97706;border-color:#d97706;color:#fff}
 .toolbar{display:flex;gap:10px;margin:6px 0 14px;flex-wrap:wrap}
 .toolbar input{flex:1;min-width:160px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;font:inherit}
 .toolbar select{padding:9px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:#fff}
@@ -780,9 +781,9 @@ const store = loadStore();
 function loadStore(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if(raw) return Object.assign({records:{},wrong:{},exams:[],imported:[],session:null,randomLogs:[]}, JSON.parse(raw));
+    if(raw) return Object.assign({records:{},wrong:{},exams:[],imported:[],session:null,randomLogs:[],mastered:{}}, JSON.parse(raw));
   }catch(e){}
-  return {records:{},wrong:{},exams:[],imported:[],session:null,randomLogs:[]};
+  return {records:{},wrong:{},exams:[],imported:[],session:null,randomLogs:[],mastered:{}};
 }
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(store)); return true; }catch(e){ return false; } }
 function resetAll(){
@@ -846,6 +847,8 @@ function route(v){
   else if(v.name==='wrong') renderWrong();
   else if(v.name==='import') renderImport();
   else if(v.name==='randomResult') renderRandomResult();
+  else if(v.name==='memo') renderMemo();
+  else if(v.name==='memoResult') renderMemoResult();
   window.scrollTo({top:0});
 }
 function openDrawer(){
@@ -897,6 +900,8 @@ function renderHome(){
   const acc = done? Math.round(right/done*100):0;
   const wq = totalWrong();
   const logs = store.randomLogs || [];
+  const memoLogs = store.memoLogs || [];
+  const masteredCount = Object.keys(store.mastered || {}).length;
 
   const s = store.session;
   const resume = (s && s.mode==='practice' && getPaper(s.paperId))
@@ -911,6 +916,9 @@ function renderHome(){
   const recent = logs.length ? `
     <div class="dim" style="margin-top:14px">最近随机练习：</div>
     <div style="margin-top:2px">${recentLogsHtml(logs.slice(0,3))}</div>` : '';
+  const recentMemo = memoLogs.length ? `
+    <div class="dim" style="margin-top:14px">最近背题：</div>
+    <div style="margin-top:2px">${recentMemoHtml(memoLogs.slice(0,3))}</div>` : '';
 
   $('#app').innerHTML = `
     <div class="hero"><h1>CDGA 答题系统</h1>
@@ -920,19 +928,33 @@ function renderHome(){
       <div class="rnghead">🎲 随机练习</div>
       <div class="muted">从全部 ${totalQ} 道题里随机抽取，专练薄弱点</div>
       <div class="rngpick" style="margin-top:14px">
-        <button class="chip ${rngN===5?'on':''}" onclick="setRng(5)">5 题</button>
-        <button class="chip ${rngN===10?'on':''}" onclick="setRng(10)">10 题</button>
-        <button class="chip ${rngN===20?'on':''}" onclick="setRng(20)">20 题</button>
+        <button class="chip ${rngN===5?'on':''}" data-n="5" onclick="setRng(5)">5 题</button>
+        <button class="chip ${rngN===10?'on':''}" data-n="10" onclick="setRng(10)">10 题</button>
+        <button class="chip ${rngN===20?'on':''}" data-n="20" onclick="setRng(20)">20 题</button>
       </div>
       <button class="btn p" style="margin-top:14px;width:100%" onclick="startRandom(rngN)">开始随机练习 →</button>
       ${recent}
+    </div>
+
+    <div class="card rngcard" style="margin-top:14px;background:linear-gradient(180deg,#fffaf2,#fff);border-color:#f3d9b0">
+      <div class="rnghead">📖 背题模式</div>
+      <div class="muted">先看题干和选项，点开答案对照记忆，再标记「记住了 / 没记住」</div>
+      <div class="rngpick memopick" style="margin-top:14px">
+        <button class="chip ${memoN===5?'on':''}" data-n="5" onclick="setMemo(5)">5 题</button>
+        <button class="chip ${memoN===10?'on':''}" data-n="10" onclick="setMemo(10)">10 题</button>
+        <button class="chip ${memoN===20?'on':''}" data-n="20" onclick="setMemo(20)">20 题</button>
+      </div>
+      <button class="btn p" style="margin-top:14px;width:100%;background:#d97706" onclick="startMemo(memoN)">开始背题 →</button>
+      ${recentMemo}
     </div>
 
     <div class="stats" style="margin:18px 0">
       <div class="stat"><b>${done}</b><span>已作答</span></div>
       <div class="stat"><b>${acc}%</b><span>总正确率</span></div>
       <div class="stat"><b style="color:${wq?'var(--bad)':'var(--ink3)'}">${wq}</b><span>错题本</span></div>
+      <div class="stat"><b style="color:var(--ok)">${masteredCount}</b><span>已掌握</span></div>
       <div class="stat"><b>${logs.length}</b><span>随机练习</span></div>
+      <div class="stat"><b>${memoLogs.length}</b><span>背题</span></div>
     </div>
 
     <button class="card paperpick" onclick="openDrawer()">
@@ -1618,12 +1640,17 @@ $('#navHome').onclick = ()=>{ if(view.name==='exam' && !confirm('考试进行中
    首页 UI 状态（搜索 / 随机练习题数）
    ===================================================================== */
 let rngN = 10;
+let memoN = 10;
 let homeQ = '';
 let homeSort = 'name';
 
 function setRng(n){
   rngN = n;
   document.querySelectorAll('.rngpick .chip').forEach(c=>c.classList.toggle('on', +c.dataset.n===n));
+}
+function setMemo(n){
+  memoN = n;
+  document.querySelectorAll('.memopick .chip').forEach(c=>c.classList.toggle('on', +c.dataset.n===n));
 }
 function homeSearch(v){ homeQ = (v||'').trim(); renderPaperList(); }
 
@@ -1653,6 +1680,7 @@ function paperRows(){
       <div class="btnrow" style="flex-direction:column">
         <button class="btn p" onclick="startPractice('${p.id}')">练习模式</button>
         <button class="btn g" onclick="route({name:'examStart',paperId:'${p.id}'})">考试模式</button>
+        <button class="btn" style="border-color:#f3d9b0;color:#d97706" onclick="startMemoFromPaper('${p.id}')">背题模式</button>
         ${isBuiltin(p.id)?'':`<button class="btn d sm" onclick="removeImported('${p.id}')">移除</button>`}
       </div>
     </div>`;
@@ -1763,6 +1791,169 @@ function renderRandomResult(){
       ${wrongHtml}
     </div>`;
 }
+
+/* =====================================================================
+   背题模式（记忆闪卡）
+   view: {name:'memo', from:'random'|'paper', paperId?, list:[{pid,no}], index, revealed:{}, marked:{}, startTs}
+   - 不判分、不写 store.records、不影响正确率/错题本
+   - 「记住了/没记住」写入 store.mastered（掌握度追踪），并记入 store.memoLogs
+   ===================================================================== */
+function startMemo(n){
+  const total = allPapers().reduce((a,p)=>a+p.questions.length,0);
+  n = Math.max(1, Math.min(total, (n|0) || memoN));
+  const list = sampleAll(n);
+  if(!list.length){ toast('题库为空'); return; }
+  route({name:'memo', from:'random', index:0, list, revealed:{}, marked:{}, startTs:Date.now()});
+}
+function startMemoFromPaper(paperId){
+  const p = getPaper(paperId);
+  if(!p || !p.questions.length){ toast('该卷没有题目'); return; }
+  const list = p.questions.map(q=>({pid:p.id, no:q.no}));
+  route({name:'memo', from:'paper', paperId, index:0, list, revealed:{}, marked:{}, startTs:Date.now()});
+}
+function renderMemo(){
+  const list = view.list;
+  const idx = Math.min(Math.max(0, view.index|0), list.length-1);
+  view.index = idx;
+  const item = list[idx];
+  const p = getPaper(item.pid);
+  const q = p.questions.find(x=>x.no===item.no);
+  const k = qkey(p.id,q.no);
+  const revealed = !!view.revealed[k];
+  const marked = view.marked[k] || '';
+  const opts = LETTERS.filter(L=>q.options[L]!==undefined).map(L=>{
+    let cls='opt locked';
+    if(revealed && q.answer.indexOf(L)>=0) cls += ' right';
+    return `<div class="${cls}"><span class="k">${L}</span><span class="v">${esc(q.options[L])}</span></div>`;
+  }).join('');
+
+  const tip = revealed
+    ? `<div class="tip ok">
+        <div class="h">正确答案：${esc(q.answer)}</div>
+        ${q.explain? `<div class="ex"><b>解析</b>　${esc(q.explain)}</div>` : '<div class="ex dim">本题无解析</div>'}
+      </div>`
+    : '';
+
+  const head = `<button class="btn g sm" onclick="abortMemo()">← 放弃</button><span class="badge" style="background:#fff4e5;color:#d97706">背题模式</span>`;
+  const markBtns = revealed ? `
+    <div class="btnrow memo-mark" style="margin-top:16px">
+      <button class="btn ${marked==='known'?'p':'g'}" onclick="memoMarkState('known')">✓ 记住了</button>
+      <button class="btn ${marked==='unknown'?'d':'g'}" onclick="memoMarkState('unknown')">✗ 没记住</button>
+    </div>` : '';
+
+  $('#app').innerHTML = `
+    <div class="qhead">
+      ${head}
+      <span class="badge ${q.type==='multi'?'multi':''}">${typeLabel(q)}</span>
+      <span class="dim">${esc(p.name)}</span>
+      <div class="spacer" style="flex:1"></div>
+      <span class="pgtext">${idx+1} / ${list.length}</span>
+    </div>
+    <div class="card">
+      <div class="stem">${esc(q.stem)}</div>
+      <div class="opts">${opts}</div>
+      ${!revealed ? `<div class="btnrow" style="margin-top:16px"><button class="btn p" style="background:#d97706" onclick="memoReveal()">显示答案</button></div>` : ''}
+      ${tip}
+      ${markBtns}
+      ${idx===list.length-1 ? `<div class="btnrow" style="margin-top:16px"><button class="btn p" onclick="finishMemo()">完成背题，查看结果</button></div>` : ''}
+    </div>`;
+
+  $('#navbar').innerHTML = `<div class="navbar"><div class="inner">
+    <button class="btn g sm" onclick="memoGo(-1)" ${idx===0?'disabled':''}>上一题</button>
+    <div class="spacer"></div>
+    <button class="btn p sm" onclick="memoGo(1)" ${idx===list.length-1?'disabled':''}>下一题</button>
+  </div></div>`;
+}
+function memoReveal(){
+  const item = view.list[view.index];
+  const p = getPaper(item.pid);
+  const q = p.questions.find(x=>x.no===item.no);
+  view.revealed[qkey(p.id,q.no)] = true;
+  renderMemo();
+}
+function memoMarkState(state){
+  const item = view.list[view.index];
+  const p = getPaper(item.pid);
+  const q = p.questions.find(x=>x.no===item.no);
+  const k = qkey(p.id,q.no);
+  view.marked[k] = state;
+  store.mastered = store.mastered || {};
+  if(state==='known') store.mastered[k] = true; else delete store.mastered[k];
+  save();
+  if(view.index < view.list.length-1) memoGo(1); else renderMemo();
+}
+function memoGo(d){
+  const n = view.index + d;
+  if(n<0 || n>=view.list.length) return;
+  view.index = n; renderMemo();
+}
+function abortMemo(){
+  if(confirm('放弃本次背题？进度不会保存。')) route({name:'home'});
+}
+function finishMemo(){
+  const items = view.list.map(it=>{
+    const k = qkey(it.pid, it.no);
+    return {pid:it.pid, no:it.no, marked:view.marked[k]||''};
+  });
+  const known = items.filter(it=>it.marked==='known').length;
+  const unknown = items.filter(it=>it.marked==='unknown').length;
+  const usedSec = Math.round((Date.now()-(view.startTs||Date.now()))/1000);
+  const log = {ts:Date.now(), total:items.length, known, unknown, usedSec, items};
+  store.memoLogs = store.memoLogs || [];
+  store.memoLogs.unshift(log);
+  if(store.memoLogs.length>50) store.memoLogs = store.memoLogs.slice(0,50);
+  save();
+  route({name:'memoResult', result:log});
+}
+function renderMemoResult(){
+  const r = view.result;
+  const total = r.total||0, known = r.known||0, unknown = r.unknown||0;
+  const unItems = (r.items||[]).filter(it=>it.marked!=='known');
+  const unHtml = unItems.length ? unItems.map(it=>{
+    const p = getPaper(it.pid);
+    const q = p && p.questions.find(x=>x.no===it.no);
+    if(!q) return '';
+    return `<div class="item">
+      <div class="qh">${q.no}. ${esc(q.stem)}</div>
+      <div class="dim">${LETTERS.filter(L=>q.options[L]!==undefined).map(L=>esc(L)+'. '+esc(q.options[L])).join('　')}</div>
+      <div class="ansline"><span>正确答案：<span class="y">${esc(q.answer)}</span></span></div>
+      ${q.explain? `<div class="dim" style="margin-top:6px">解析：${esc(q.explain)}</div>`:''}
+    </div>`;
+  }).join('') : '<div class="empty"><div class="ico">🎉</div>全部记住了，没有没记住的题</div>';
+
+  $('#app').innerHTML = `
+    <div class="card score">
+      <div class="big ${known>=total/2?'pass':'fail'}">${known}<span style="font-size:16px;color:var(--ink3)">/${total}</span></div>
+      <div class="sub">背题完成 · 记住 ${known} 题</div>
+      <div class="stats">
+        <div class="stat"><b style="color:var(--ok)">${known}</b><span>记住了</span></div>
+        <div class="stat"><b style="color:var(--bad)">${unknown}</b><span>没记住</span></div>
+        <div class="stat"><b>${fmtTime(r.usedSec||0)}</b><span>用时</span></div>
+      </div>
+    </div>
+    <div class="btnrow" style="margin:14px 0 20px">
+      <button class="btn p" style="background:#d97706" onclick="startMemo(${total})">再背 ${total} 题</button>
+      <button class="btn g" onclick="route({name:'home'})">返回首页</button>
+    </div>
+    <div class="card review">
+      <h2 class="sec">没记住的题 <span class="n">${unItems.length}</span></h2>
+      ${unHtml}
+    </div>`;
+}
+function recentMemoHtml(logs){
+  return logs.map((log)=>{
+    const d = new Date(log.ts);
+    const ds = (d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    return `<div class="logitem">
+      <span class="score ${log.known>=log.total/2?'ok':'bad'}">${log.known}/${log.total}</span>
+      <span class="muted">记住 ${log.known} · 没记住 ${log.unknown} · ${fmtTime(log.usedSec)}</span>
+      <span class="dim">${ds}</span>
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn g sm" onclick="reviewMemo(${log.ts})">回顾</button>
+    </div>`;
+  }).join('');
+}
+function reviewMemo(ts){ const log = (store.memoLogs||[]).find(l=>l.ts===ts); if(log) route({name:'memoResult', result:log}); }
 
 /* 启动 */
 route({name:'home'});
