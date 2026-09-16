@@ -1038,7 +1038,7 @@ function renderPractice(){
   const head = view.from==='wrong'
     ? `<button class="btn g sm" onclick="route({name:'wrong'})">← 错题本</button><span class="badge" style="background:#fdeaea;color:#dc2626">错题重做</span>`
     : view.from==='random'
-    ? `<button class="btn g sm" onclick="abortRandom()">← 放弃</button><span class="badge" style="background:var(--primary-soft);color:var(--primary)">随机练习</span>`
+    ? `<button class="btn g sm" onclick="abortRandom()">← 返回</button><span class="badge" style="background:var(--primary-soft);color:var(--primary)">随机练习</span>`
     : `<button class="btn g sm" onclick="route({name:'home'})">← 返回</button>`;
 
   $('#app').innerHTML = `
@@ -1724,7 +1724,7 @@ function startRandom(n){
   route({name:'practice', from:'random', index:0, list, startTs:Date.now()});
 }
 function abortRandom(){
-  if(confirm('放弃本次随机练习？进度不会保存。')) route({name:'home'});
+  route({name:'home'});
 }
 function finishRandom(){
   const list = view.list;
@@ -1834,7 +1834,7 @@ function renderMemo(){
       </div>`
     : '';
 
-  const head = `<button class="btn g sm" onclick="abortMemo()">← 放弃</button><span class="badge" style="background:#fff4e5;color:#d97706">背题模式</span>`;
+  const head = `<button class="btn g sm" onclick="abortMemo()">← 返回</button><span class="badge" style="background:#fff4e5;color:#d97706">背题模式</span>`;
   const markBtns = `
     <div class="btnrow memo-mark" style="margin-top:16px">
       <button class="btn ${marked==='known'?'p':'g'}" onclick="memoMarkState('known')">✓ 记住了</button>
@@ -1880,7 +1880,7 @@ function memoGo(d){
   view.index = n; renderMemo();
 }
 function abortMemo(){
-  if(confirm('放弃本次背题？进度不会保存。')) route({name:'home'});
+  route({name:'home'});
 }
 function finishMemo(){
   const items = view.list.map(it=>{
