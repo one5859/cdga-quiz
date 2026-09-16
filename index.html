@@ -915,10 +915,10 @@ function renderHome(){
 
   const recent = logs.length ? `
     <div class="dim" style="margin-top:14px">最近随机练习：</div>
-    <div style="margin-top:2px">${recentLogsHtml(logs.slice(0,3))}</div>` : '';
+    <div style="margin-top:2px">${recentLogsHtml(logs.slice(0,1))}</div>` : '';
   const recentMemo = memoLogs.length ? `
     <div class="dim" style="margin-top:14px">最近背题：</div>
-    <div style="margin-top:2px">${recentMemoHtml(memoLogs.slice(0,3))}</div>` : '';
+    <div style="margin-top:2px">${recentMemoHtml(memoLogs.slice(0,1))}</div>` : '';
 
   $('#app').innerHTML = `
     <div class="hero"><h1>CDGA 答题系统</h1>
