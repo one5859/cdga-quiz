@@ -1819,7 +1819,7 @@ function renderMemo(){
   const p = getPaper(item.pid);
   const q = p.questions.find(x=>x.no===item.no);
   const k = qkey(p.id,q.no);
-  const revealed = !!view.revealed[k];
+  const revealed = true;
   const marked = view.marked[k] || '';
   const opts = LETTERS.filter(L=>q.options[L]!==undefined).map(L=>{
     let cls='opt locked';
@@ -1835,11 +1835,11 @@ function renderMemo(){
     : '';
 
   const head = `<button class="btn g sm" onclick="abortMemo()">← 放弃</button><span class="badge" style="background:#fff4e5;color:#d97706">背题模式</span>`;
-  const markBtns = revealed ? `
+  const markBtns = `
     <div class="btnrow memo-mark" style="margin-top:16px">
       <button class="btn ${marked==='known'?'p':'g'}" onclick="memoMarkState('known')">✓ 记住了</button>
       <button class="btn ${marked==='unknown'?'d':'g'}" onclick="memoMarkState('unknown')">✗ 没记住</button>
-    </div>` : '';
+    </div>`;
 
   $('#app').innerHTML = `
     <div class="qhead">
@@ -1852,7 +1852,6 @@ function renderMemo(){
     <div class="card">
       <div class="stem">${esc(q.stem)}</div>
       <div class="opts">${opts}</div>
-      ${!revealed ? `<div class="btnrow" style="margin-top:16px"><button class="btn p" style="background:#d97706" onclick="memoReveal()">显示答案</button></div>` : ''}
       ${tip}
       ${markBtns}
       ${idx===list.length-1 ? `<div class="btnrow" style="margin-top:16px"><button class="btn p" onclick="finishMemo()">完成背题，查看结果</button></div>` : ''}
@@ -1863,13 +1862,6 @@ function renderMemo(){
     <div class="spacer"></div>
     <button class="btn p sm" onclick="memoGo(1)" ${idx===list.length-1?'disabled':''}>下一题</button>
   </div></div>`;
-}
-function memoReveal(){
-  const item = view.list[view.index];
-  const p = getPaper(item.pid);
-  const q = p.questions.find(x=>x.no===item.no);
-  view.revealed[qkey(p.id,q.no)] = true;
-  renderMemo();
 }
 function memoMarkState(state){
   const item = view.list[view.index];
