@@ -192,17 +192,21 @@ h2.sec .n{font-size:12px;font-weight:600;color:var(--ink3);background:var(--bg);
 /* ---------- 试卷抽屉 ---------- */
 #drawerMask{position:fixed;inset:0;background:rgba(15,23,42,.45);opacity:0;pointer-events:none;transition:opacity .25s;z-index:50}
 #drawerMask.show{opacity:1;pointer-events:auto}
-#drawer{position:fixed;top:0;right:0;height:100%;width:min(440px,94vw);background:var(--bg);box-shadow:-10px 0 40px rgba(20,25,45,.18);transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);z-index:51;display:flex;flex-direction:column}
+#drawer{position:fixed;top:0;right:0;height:100%;width:min(380px,92vw);background:var(--bg);box-shadow:-10px 0 40px rgba(20,25,45,.18);transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);z-index:51;display:flex;flex-direction:column}
 #drawer.show{transform:none}
-.drawer-head{display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--card);border-bottom:1px solid var(--line)}
+.drawer-head{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--card);border-bottom:1px solid var(--line)}
 .drawer-head h3{margin:0;font-size:17px}
 .drawer-head .close{margin-left:auto;width:34px;height:34px;border-radius:10px;font-size:16px;color:var(--ink2);background:var(--bg)}
 .drawer-head .close:hover{background:var(--line)}
-.drawer-tools{padding:12px 16px;background:var(--card);border-bottom:1px solid var(--line)}
+.drawer-tools{padding:10px 14px;background:var(--card);border-bottom:1px solid var(--line)}
 .drawer-tools .toolbar{margin:0}
-.drawer-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:14px 16px 22px}
-.drawer-body .card.paper{margin-bottom:12px}
+.drawer-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:10px 14px 16px}
+.drawer-body .card.paper{margin-bottom:8px;padding:13px 14px}
 .drawer-body .card.paper:last-child{margin-bottom:0}
+.drawer-body .metrics{margin-top:8px;gap:14px}
+.drawer-body .bar{margin-top:8px}
+.drawer-body .info h3{margin-bottom:4px}
+.drawer-body .btnrow .btn{padding:8px 12px}
 </style>
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
