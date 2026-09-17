@@ -816,6 +816,12 @@ const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<'
 const qkey = (pid,no) => pid+':'+no;
 const allPapers = () => BANK.papers.concat(store.imported || []);
 const getPaper = id => allPapers().find(p=>p.id===id);
+const findSet = pid => {
+  const p = getPaper(pid);
+  if(p) return p;
+  const c = (BANK.chapters||[]).find(x=>x.id===pid);
+  return c ? {id:c.id, name:c.title, source:c.source||'章节', isChapter:true, questions:c.questions} : null;
+};
 const isBuiltin = id => BANK.papers.some(p=>p.id===id);
 const LETTERS = ['A','B','C','D','E','F','G','H'];
 const TYPE_CN = {single:'单选题', multi:'多选题', judge:'判断题'};
@@ -1034,7 +1040,7 @@ function renderPractice(){
   view.index = idx;
 
   const item = view.list[idx];
-  const p = getPaper(item.pid);
+  const p = findSet(item.pid);
   const q = p.questions.find(x=>x.no===item.no);
   const k = qkey(p.id,q.no);
   const rec = store.records[k];
@@ -1101,7 +1107,7 @@ function renderPractice(){
 
 function practicePick(L){
   const item = curItem();
-  const p = getPaper(item.pid);
+  const p = findSet(item.pid);
   const q = p.questions.find(x=>x.no===item.no);
   const k = qkey(p.id,q.no);
   const multi = q.type==='multi';
@@ -1124,7 +1130,7 @@ function practicePick(L){
   if(correct){
     if(store.wrong[k]){ delete store.wrong[k]; toast('答对了，已移出错题本'); }
   }else{
-    store.wrong[k] = {ts:Date.now()};
+    if(!p.isChapter) store.wrong[k] = {ts:Date.now()};
   }
   save();
   view._selKey = k; view._sel = [];
@@ -1142,7 +1148,7 @@ function go(d){
 function openSheet(){
   const list = view.list;
   const cells = list.map((it,i)=>{
-    const q = getPaper(it.pid).questions.find(x=>x.no===it.no);
+    const q = findSet(it.pid).questions.find(x=>x.no===it.no);
     const r = store.records[qkey(it.pid,it.no)];
     let cls='gcell'; if(r) cls += r.correct? ' ok':' bad';
     if(i===view.index) cls += ' cur';
@@ -1745,6 +1751,10 @@ function sampleAll(n){
     if(rec[qkey(p.id, q.no)]) return;            // 已做过的题不再出现
     pool.push({pid:p.id, no:q.no});
   }));
+  (BANK.chapters||[]).forEach(c => c.questions.forEach(q => {
+    if(rec[qkey(c.id, q.no)]) return;            // 章节题：已做过的也不再出现
+    pool.push({pid:c.id, no:q.no});
+  }));
   for(let i=pool.length-1; i>0; i--){
     const j = Math.floor(Math.random()*(i+1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -1792,7 +1802,7 @@ function renderRandomResult(){
   const wrongItems = (r.items||[]).filter(it=>!it.correct);
 
   const wrongHtml = wrongItems.length ? wrongItems.map(it=>{
-    const p = getPaper(it.pid);
+    const p = findSet(it.pid);
     const q = p && p.questions.find(x=>x.no===it.no);
     if(!q) return '';
     return `<div class="item">
@@ -1834,10 +1844,10 @@ function renderRandomResult(){
    - 「记住了/没记住」写入 store.mastered（掌握度追踪），并记入 store.memoLogs
    ===================================================================== */
 function startMemo(n){
-  const total = allPapers().reduce((a,p)=>a+p.questions.length,0);
+  const total = allPapers().reduce((a,p)=>a+p.questions.length,0) + (BANK.chapters||[]).reduce((a,c)=>a+c.questions.length,0);
   n = Math.max(1, Math.min(total, (n|0) || memoN));
   const list = sampleAll(n);
-  if(!list.length){ toast('题库为空'); return; }
+  if(!list.length){ toast('所有题都做过啦，点首页「清空全部记录」后可重新背题'); return; }
   route({name:'memo', from:'random', index:0, list, revealed:{}, marked:{}, startTs:Date.now()});
 }
 function startMemoFromPaper(paperId){
@@ -1851,7 +1861,7 @@ function renderMemo(){
   const idx = Math.min(Math.max(0, view.index|0), list.length-1);
   view.index = idx;
   const item = list[idx];
-  const p = getPaper(item.pid);
+  const p = findSet(item.pid);
   const q = p.questions.find(x=>x.no===item.no);
   const k = qkey(p.id,q.no);
   const revealed = true;
@@ -1900,7 +1910,7 @@ function renderMemo(){
 }
 function memoMarkState(state){
   const item = view.list[view.index];
-  const p = getPaper(item.pid);
+  const p = findSet(item.pid);
   const q = p.questions.find(x=>x.no===item.no);
   const k = qkey(p.id,q.no);
   view.marked[k] = state;
@@ -1937,7 +1947,7 @@ function renderMemoResult(){
   const total = r.total||0, known = r.known||0, unknown = r.unknown||0;
   const unItems = (r.items||[]).filter(it=>it.marked!=='known');
   const unHtml = unItems.length ? unItems.map(it=>{
-    const p = getPaper(it.pid);
+    const p = findSet(it.pid);
     const q = p && p.questions.find(x=>x.no===it.no);
     if(!q) return '';
     return `<div class="item">
