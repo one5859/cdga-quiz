@@ -914,7 +914,8 @@ function renderHome(){
       </div>`;
     return;
   }
-  const totalQ = allPapers().reduce((a,p)=>a+p.questions.length,0);
+  const chQ = (BANK.chapters||[]).reduce((a,c)=>a+c.questions.length,0);
+  const totalQ = allPapers().reduce((a,p)=>a+p.questions.length,0) + chQ;
   let done=0, right=0;
   allPapers().forEach(p=>p.questions.forEach(q=>{ const r=store.records[qkey(p.id,q.no)]; if(r){ done++; if(r.correct) right++; } }));
   const acc = done? Math.round(right/done*100):0;
@@ -946,11 +947,11 @@ function renderHome(){
 
   $('#app').innerHTML = `
     <div class="hero"><h1>CDGA 答题系统</h1>
-      <div class="muted">共 ${allPapers().length} 套试卷 / ${totalQ} 道题 · 数据存在本机浏览器，不上传</div></div>
+      <div class="muted">共 ${allPapers().length} 套试卷 · ${CHAPTERS.length} 章 / 合计 ${totalQ} 道题 · 数据存在本机浏览器，不上传</div></div>
     ${resume}
     <div class="card rngcard">
       <div class="rnghead">🎲 随机练习</div>
-      <div class="muted">从全部 ${totalQ} 道题里随机抽取，专练薄弱点</div>
+      <div class="muted">从全部题库随机抽取（共 ${totalQ} 道题），专练薄弱点</div>
       <div class="rngpick" style="margin-top:14px">
         <button class="chip ${rngN===5?'on':''}" data-n="5" onclick="setRng(5)">5 题</button>
         <button class="chip ${rngN===10?'on':''}" data-n="10" onclick="setRng(10)">10 题</button>
