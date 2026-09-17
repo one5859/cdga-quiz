@@ -1740,7 +1740,11 @@ function reviewLog(i){ const log = (store.randomLogs||[])[i]; if(log) route({nam
    ===================================================================== */
 function sampleAll(n){
   const pool = [];
-  allPapers().forEach(p => p.questions.forEach(q => pool.push({pid:p.id, no:q.no})));
+  const rec = store.records || {};
+  allPapers().forEach(p => p.questions.forEach(q => {
+    if(rec[qkey(p.id, q.no)]) return;            // 已做过的题不再出现
+    pool.push({pid:p.id, no:q.no});
+  }));
   for(let i=pool.length-1; i>0; i--){
     const j = Math.floor(Math.random()*(i+1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -1748,10 +1752,10 @@ function sampleAll(n){
   return pool.slice(0, Math.min(n, pool.length));
 }
 function startRandom(n){
-  const total = allPapers().reduce((a,p)=>a+p.questions.length,0);
-  n = Math.max(1, Math.min(total, (n|0) || rngN));
+  n = Math.max(1, (n|0) || rngN);
   const list = sampleAll(n);
-  if(!list.length){ toast('题库为空'); return; }
+  if(!list.length){ toast('所有题都做过啦，点首页「清空全部记录」后可重新练习'); return; }
+  if(list.length < n){ toast('未做题不足，已为你抽取 '+list.length+' 题'); }
   route({name:'practice', from:'random', index:0, list, startTs:Date.now()});
 }
 function abortRandom(){
