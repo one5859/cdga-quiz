@@ -931,7 +931,7 @@ function resumePractice(){
    - id 要唯一；用户点过「×」全部已读后会记在本机，下次不再弹（除非换了新 id）
    - 改文案时建议顺手换个新 id，确保老用户也能看到更新 */
 const ANNOUNCES = [
-  {id:'20260919-update', date:'2026-09-19', text:'题库已更新：新增「按章节复习」模块（12 章共 190 题），并修复了部分题目的选项解析问题。'},
+  {id:'20260919-bank-update', date:'2026-09-19', text:'题库更新：新增 DMBOK2 修订版补充模拟题 124 道（重点覆盖数据处理伦理、数据治理术语变更、大数据与数据科学、数据质量等修订版强化方向），全部题库已按官方教材 17 章重新分类，可在「章节复习」中按章练习。'},
 ];
 function noticeOff(){ try{ return JSON.parse(localStorage.getItem('cdga_notice_off')||'[]'); }catch(e){ return []; } }
 function noticeHideAll(){

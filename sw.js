@@ -1,5 +1,5 @@
 /* CDGA 答题系统 Service Worker —— 让手机端可离线使用 */
-const CACHE = 'cdga-quiz-20260919182307';
+const CACHE = 'cdga-quiz-20260919185348';
 const SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
