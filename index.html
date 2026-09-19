@@ -219,6 +219,23 @@ h2.sec .n{font-size:12px;font-weight:600;color:var(--ink3);background:var(--bg);
 .drawer-body .bar{margin-top:8px}
 .drawer-body .info h3{margin-bottom:4px}
 .drawer-body .btnrow .btn{padding:8px 12px}
+
+/* ---------- 公告栏 ---------- */
+.notice{margin:2px 0 16px;border:1px solid #cfe3d8;background:linear-gradient(180deg,#f3fbf6,#fff);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.notice .nh{display:flex;align-items:center;gap:8px;padding:11px 14px;cursor:pointer;user-select:none}
+.notice .nh .ico{font-size:16px}
+.notice .nh b{font-size:14px}
+.notice .nh .cnt{font-size:12px;color:var(--ink3)}
+.notice .nh .chev{margin-left:auto;color:var(--ink3);transition:transform .2s}
+.notice.open .nh .chev{transform:rotate(180deg)}
+.notice .nclose{margin-left:6px;flex:0 0 28px;height:28px;border-radius:8px;color:var(--ink3);background:var(--bg);font-size:15px}
+.notice .nclose:hover{background:var(--line)}
+.notice .nb{padding:0 14px 14px;display:none;flex-direction:column;gap:12px}
+.notice.open .nb{display:flex}
+.nitem{border-top:1px dashed var(--line);padding-top:11px;margin-top:11px}
+.nitem:first-child{border-top:0;padding-top:0;margin-top:0}
+.nitem .nd{font-size:12px;color:var(--ink3);margin-bottom:3px}
+.nitem .nt{font-size:13.5px;line-height:1.75;color:var(--ink2);white-space:pre-wrap}
 </style>
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -902,6 +919,34 @@ function resumePractice(){
 /* =====================================================================
    首页
    ===================================================================== */
+/* 公告数据：想发新通知就在这里加一条 {id, date, text}
+   - id 要唯一；用户点过「×」全部已读后会记在本机，下次不再弹（除非换了新 id）
+   - 改文案时建议顺手换个新 id，确保老用户也能看到更新 */
+const ANNOUNCES = [
+  {id:'20260919-update', date:'2026-09-19', text:'题库已更新：新增「按章节复习」模块（12 章共 190 题），并修复了部分题目的选项解析问题。'},
+];
+function noticeOff(){ try{ return JSON.parse(localStorage.getItem('cdga_notice_off')||'[]'); }catch(e){ return []; } }
+function noticeHideAll(){
+  const a = noticeOff();
+  ANNOUNCES.forEach(x => { if(!a.includes(x.id)) a.push(x.id); });
+  localStorage.setItem('cdga_notice_off', JSON.stringify(a));
+  route({name:'home'});
+}
+function noticeHtml(){
+  const off = noticeOff();
+  const items = ANNOUNCES.filter(a => !off.includes(a.id));
+  if(!items.length) return '';
+  const body = items.map(a => `<div class="nitem"><div class="nd">${esc(a.date)}</div><div class="nt">${esc(a.text)}</div></div>`).join('');
+  return `<div class="notice open" id="noticeBox">
+    <div class="nh" onclick="document.getElementById('noticeBox').classList.toggle('open')">
+      <span class="ico">📢</span><b>公告</b><span class="cnt">${items.length} 条未读</span>
+      <span class="chev">▾</span>
+      <button class="nclose" onclick="event.stopPropagation();noticeHideAll()" aria-label="全部已读">×</button>
+    </div>
+    <div class="nb">${body}</div>
+  </div>`;
+}
+
 function renderHome(){
   if(!allPapers().length){
     $('#app').innerHTML = `
@@ -954,6 +999,7 @@ function renderHome(){
   $('#app').innerHTML = `
     <div class="hero"><h1>CDGA 答题系统</h1>
       <div class="muted">共 ${allPapers().length} 套试卷 · ${CHAPTERS.length} 章 / 合计 ${totalQ} 道题 · 数据存在本机浏览器，不上传</div></div>
+    ${noticeHtml()}
     ${resume}
     <div class="card rngcard">
       <div class="rnghead">🎲 随机练习</div>
