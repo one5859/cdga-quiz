@@ -1013,6 +1013,12 @@ function renderHome(){
       <div class="muted">共 ${allPapers().length} 套试卷 · ${CHAPTERS.length} 章 / 合计 ${totalQ} 道题 · 数据存在本机浏览器，不上传</div></div>
     ${noticeHtml()}
     ${resume}
+    <button class="card paperpick" onclick="route({name:'chapters'})">
+      <span class="pp-ico">🗂️</span>
+      <span class="pp-txt"><b>章节复习</b><span class="dim">按 DAMA 章节逐章刷题 · 练习 / 背题 / 随机抽题</span></span>
+      <span class="pp-arrow">›</span>
+    </button>
+
     <div class="card rngcard">
       <div class="rnghead">🎲 随机练习</div>
       <div class="muted">从全部题库随机抽取（共 ${totalQ} 道题），专练薄弱点</div>
@@ -1043,12 +1049,6 @@ function renderHome(){
       <div class="stat"><b>${logs.length}</b><span>随机练习</span></div>
       <div class="stat"><b>${memoLogs.length}</b><span>背题</span></div>
     </div>
-
-    <button class="card paperpick" onclick="route({name:'chapters'})">
-      <span class="pp-ico">🗂️</span>
-      <span class="pp-txt"><b>章节复习</b><span class="dim">按 DAMA 章节逐章刷题 · 练习 / 背题 / 随机抽题</span></span>
-      <span class="pp-arrow">›</span>
-    </button>
 
     ${recBlock}
 
