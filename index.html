@@ -804,7 +804,7 @@ function loadStore(){
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(store)); return true; }catch(e){ return false; } }
 function resetAll(){
   if(!confirm('确定清空全部答题记录、错题本和考试历史吗？此操作不可撤销。')) return;
-  store.records={}; store.wrong={}; store.exams=[]; store.session=null; save();
+  store.records={}; store.wrong={}; store.exams=[]; store.session=null; store.mastered={}; save();
   toast('已清空全部记录'); route({name:'home'});
 }
 
@@ -2042,9 +2042,22 @@ function renderChapter(cid){
         <button class="chip" onclick="route({name:'chapterPractice',cid:'${c.id}',mode:'rand10',index:0})">10 题</button>
         <button class="chip" onclick="route({name:'chapterPractice',cid:'${c.id}',mode:'randAll',index:0})">本章全部</button>
       </div>
+      <div class="btnrow" style="margin-top:14px;justify-content:flex-end">
+        <button class="btn d sm" onclick="clearChapterRecords('${c.id}')">🧹 清除本章做题记录</button>
+      </div>
     </div>`;
 }
 
+function clearChapterRecords(cid, silent){
+  if(!silent && !confirm('清除本章的做题记录与掌握度标记吗？此操作不可撤销。')) return;
+  const pre = cid + '#';
+  Object.keys(store.records).forEach(k=>{ if(k.indexOf(pre)===0) delete store.records[k]; });
+  store.mastered = store.mastered || {};
+  Object.keys(store.mastered).forEach(k=>{ if(k.indexOf(pre)===0) delete store.mastered[k]; });
+  save();
+  if(!silent) toast('已清除本章记录');
+  if(!silent) route({name:'chapter', cid:cid});
+}
 function chapterBuildList(){
   const c = chapterById(view.cid);
   let qs = c.questions.slice();
@@ -2169,6 +2182,7 @@ function chapterPracticeFinish(){
       <div style="max-height:50vh;overflow:auto">${wh}</div>
       <div class="btnrow" style="margin-top:16px">
         <button class="btn g" onclick="closeSheet()">关闭</button>
+        <button class="btn d" onclick="closeSheet();clearChapterRecords('${c.id}',true);route({name:'chapterPractice',cid:'${c.id}',mode:'seq',index:0})">重做本章</button>
         <button class="btn p" onclick="closeSheet();route({name:'chapter',cid:'${c.id}'})">返回章节</button>
       </div>
     </div></div>`;
