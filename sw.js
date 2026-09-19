@@ -1,5 +1,5 @@
 /* CDGA 答题系统 Service Worker —— 让手机端可离线使用 */
-const CACHE = 'cdga-quiz-20260919221850';
+const CACHE = 'cdga-quiz-20260919225517';
 const SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -18,18 +18,25 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
 
-  // 页面导航：网络优先，断网回退缓存（保证更新能生效）
+  // 页面导航：缓存优先 + 后台静默更新（stale-while-revalidate）
+  //   有缓存 => 立即出画面，不等网络；同时后台拉新版，下次打开生效。
+  //   没缓存（首次访问）=> 走网络。
   const isDoc = req.mode === 'navigate' ||
     (req.headers.get('accept') || '').includes('text/html');
   if (isDoc) {
     e.respondWith(
-      fetch(req)
-        .then(res => {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put('./index.html', copy));
-          return res;
+      caches.open(CACHE).then(c =>
+        c.match('./index.html').then(hit => {
+          const update = fetch(req)
+            .then(res => {
+              const copy = res.clone();
+              c.put('./index.html', copy);
+              return res;
+            })
+            .catch(() => hit);
+          return hit || update;
         })
-        .catch(() => caches.match('./index.html'))
+      )
     );
     return;
   }
