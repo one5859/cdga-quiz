@@ -2049,8 +2049,7 @@ function renderChapter(cid){
 }
 
 function clearChapterRecords(cid, silent){
-  if(!silent && !confirm('清除本章的做题记录与掌握度标记吗？此操作不可撤销。')) return;
-  const pre = cid + '#';
+  const pre = cid + ':';
   Object.keys(store.records).forEach(k=>{ if(k.indexOf(pre)===0) delete store.records[k]; });
   store.mastered = store.mastered || {};
   Object.keys(store.mastered).forEach(k=>{ if(k.indexOf(pre)===0) delete store.mastered[k]; });
