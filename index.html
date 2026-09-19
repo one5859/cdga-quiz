@@ -920,7 +920,16 @@ function closeDrawer(){
 }
 function resumePractice(){
   const s = store.session;
-  if(!s || !getPaper(s.paperId)){ toast('上次的进度已失效'); route({name:'home'}); return; }
+  if(!s){ toast('上次的进度已失效'); route({name:'home'}); return; }
+  if(s.mode==='chapter'){
+    const c = chapterById(s.cid);
+    if(!c){ toast('上次的进度已失效'); route({name:'home'}); return; }
+    const v = {name:'chapterPractice', cid:s.cid, mode:s.cmode, index:s.index|0};
+    if(s.list && s.list.length) v.clist = s.list.map(no=>({cid:s.cid, no:no}));
+    route(v);
+    return;
+  }
+  if(!getPaper(s.paperId)){ toast('上次的进度已失效'); route({name:'home'}); return; }
   route({name:'practice', paperId:s.paperId, index:s.index});
 }
 
@@ -988,10 +997,12 @@ function renderHome(){
   const masteredCount = Object.keys(store.mastered || {}).length;
 
   const s = store.session;
-  const resume = (s && s.mode==='practice' && getPaper(s.paperId))
+  const sCh = (s && s.mode==='chapter') ? chapterById(s.cid) : null;
+  const sPaper = (s && s.mode==='practice') ? getPaper(s.paperId) : null;
+  const resume = (sCh || sPaper)
     ? `<div class="card" style="margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <div style="flex:1;min-width:200px"><b>上次练习未完成</b>
-        <div class="dim" style="margin-top:2px">${esc(getPaper(s.paperId).name)} · 第 ${s.index+1} 题</div></div>
+        <div class="dim" style="margin-top:2px">${esc(sCh ? sCh.title : sPaper.name)} · 第 ${((s.index|0)+1)} 题</div></div>
         <div class="btnrow">
           <button class="btn p" onclick="resumePractice()">继续练习</button>
           <button class="btn g sm" onclick="store.session=null;save();route({name:'home'})">忽略</button>
@@ -2116,10 +2127,14 @@ function chapterBuildList(){
 
 function renderChapterPractice(){
   if(!view.clist) chapterBuildList();
-  const it = view.clist[view.index];
+  if(!view.clist.length){ toast('本章没有可练习的题目'); route({name:'home'}); return; }
+  /* 恢复进度时序号可能因题库重建而越界，这里夹紧一下 */
+  const idx = Math.min(Math.max(0, view.index|0), view.clist.length-1);
+  view.index = idx;
+  const it = view.clist[idx];
   const c = chapterById(it.cid);
   const q = c.questions.find(x=>x.no===it.no);
-  const idx = view.index;
+  if(!q){ toast('题目已更新，本章进度重新开始'); chapterBuildList(); return renderChapterPractice(); }
   const k = qkey(c.id, q.no);
   const rec = store.records[k];
   const answered = !!rec;
@@ -2138,6 +2153,11 @@ function renderChapterPractice(){
     </div>`;
   }
   const last = idx===view.clist.length-1;
+  /* 记录进度，供首页「上次练习未完成」继续:seq/randAll 的题单可由章节还原，随机抽题需存题单 */
+  const needList = (view.mode==='rand5' || view.mode==='rand10');
+  store.session = {mode:'chapter', cid:c.id, cmode:view.mode, index:idx,
+                   list: needList ? view.clist.map(x=>x.no) : null};
+  save();
   $('#app').innerHTML = `
     <div class="qhead">
       <button class="btn g sm" onclick="route({name:'chapter',cid:'${c.id}'})">← 返回</button>
@@ -2204,6 +2224,7 @@ function jumpChapter(i){ view.index=i; $('#modal').innerHTML=''; renderChapterPr
 
 function chapterPracticeFinish(){
   const c = chapterById(view.clist[0].cid);
+  store.session = null; save();   /* 本轮已完成，不再显示「上次练习未完成」 */
   let done=0, right=0; const wrongList=[];
   view.clist.forEach(it=>{
     const q = c.questions.find(x=>x.no===it.no);
