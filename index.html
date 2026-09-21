@@ -887,7 +887,28 @@ function paperStats(p){
   const total=p.questions.length;
   return {done,right,wrong,total,acc: done? Math.round(right/done*100):0, wrongBook: p.questions.filter(q=>store.wrong[qkey(p.id,q.no)]).length};
 }
-function totalWrong(){ return Object.keys(store.wrong).length; }
+/* 错题本按「归一化题干」去重：试卷与章节有大量同题（约占一半），
+   同一题干只计一次，优先保留试卷版（与 sampleAll/背题 的去重口径一致）。
+   返回 [{pid,no}...]，保证唯一且不重复计数。 */
+function uniqueWrongItems(){
+  const seen = new Map();   // normStem -> {pid,no}
+  allSets().forEach(s=> s.questions.forEach(q=>{
+    const k = qkey(s.id,q.no);
+    if(store.wrong[k]){
+      const nk = normStem(q);
+      if(!seen.has(nk)) seen.set(nk, {pid:s.id, no:q.no});  // 试卷在前 → 优先试卷版
+    }
+  }));
+  return [...seen.values()];
+}
+/* 按题干清除该题在错题本中的所有副本（试卷版+章节版），避免答对任意一份后另几份残留 */
+function clearWrongByStem(q){
+  const nk = normStem(q);
+  allSets().forEach(s=> s.questions.forEach(x=>{
+    if(x && normStem(x)===nk && store.wrong[qkey(s.id,x.no)]) delete store.wrong[qkey(s.id,x.no)];
+  }));
+}
+function totalWrong(){ return uniqueWrongItems().length; }
 
 /* =====================================================================
    路由
@@ -1103,9 +1124,11 @@ function allSets(){
     .concat((BANK.chapters||[]).map(c=>({id:c.id, name:c.title, questions:c.questions, isChapter:true})));
 }
 function wrongItems(paperId){
-  const sets = paperId ? [findSet(paperId)].filter(Boolean) : allSets();
+  if(!paperId) return uniqueWrongItems();
+  const s = findSet(paperId);
+  if(!s) return [];
   const out=[];
-  sets.forEach(s=> s.questions.forEach(q=>{ if(store.wrong[qkey(s.id,q.no)]) out.push({pid:s.id, no:q.no}); }));
+  s.questions.forEach(q=>{ if(store.wrong[qkey(s.id,q.no)]) out.push({pid:s.id, no:q.no}); });
   return out;
 }
 function curItem(){
@@ -1211,7 +1234,7 @@ function practicePick(L){
   store.records[k] = {picked, correct, ts:Date.now()};
   view._redone = view._redone || {}; view._redone[k] = true;
   if(correct){
-    if(store.wrong[k]){ delete store.wrong[k]; toast('答对了，已移出错题本'); }
+    if(store.wrong[k]){ clearWrongByStem(q); toast('答对了，已移出错题本'); }
   }else{
     if(!p.isChapter) store.wrong[k] = {ts:Date.now()};
   }
@@ -1450,11 +1473,17 @@ function renderExamResult(){
    错题本
    ===================================================================== */
 function renderWrong(){
-  const groups = allSets().map(s=>{
-    const qs = s.questions.filter(q=>store.wrong[qkey(s.id,q.no)]);
+  const items = uniqueWrongItems();
+  const setById = {};
+  allSets().forEach(s=> setById[s.id]=s);
+  const groupsMap = {};
+  items.forEach(it=>{ (groupsMap[it.pid] = groupsMap[it.pid]||[]).push(it); });
+  const groups = Object.keys(groupsMap).map(id=>{
+    const s = setById[id];
+    const qs = groupsMap[id].map(it=> s.questions.find(x=>x.no===it.no)).filter(Boolean);
     return {p:s, qs};
   }).filter(g=>g.qs.length);
-  const total = groups.reduce((a,g)=>a+g.qs.length,0);
+  const total = items.length;
 
   const body = groups.length ? groups.map(g=>`
     <div class="card" style="margin-bottom:14px">
@@ -2212,9 +2241,9 @@ function chapterPick(L){
   if(store.records[k]) return;
   const correct = L===q.answer;
   store.records[k] = {picked:L, correct, ts:Date.now()};
-  /* 章节复习的错题也纳入错题本：答错入册，重做答对移出 */
+  /* 章节复习的错题也纳入错题本：答错入册，重做答对移出（按题干清除所有副本，避免与试卷版重复残留） */
   if(correct){
-    if(store.wrong[k]){ delete store.wrong[k]; }
+    if(store.wrong[k]){ clearWrongByStem(q); }
   }else{
     store.wrong[k] = {ts:Date.now()};
   }
