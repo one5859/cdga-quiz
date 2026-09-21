@@ -1097,10 +1097,15 @@ function buildList(paperId, from){
   const p = getPaper(paperId);
   return p.questions.map(q=>({pid:p.id, no:q.no}));
 }
+/* 全部题集（试卷 + 章节），统一为 {id,name,questions,isChapter}，供错题本枚举 */
+function allSets(){
+  return allPapers().map(p=>({id:p.id, name:p.name, questions:p.questions, isChapter:false}))
+    .concat((BANK.chapters||[]).map(c=>({id:c.id, name:c.title, questions:c.questions, isChapter:true})));
+}
 function wrongItems(paperId){
+  const sets = paperId ? [findSet(paperId)].filter(Boolean) : allSets();
   const out=[];
-  (paperId? [getPaper(paperId)] : allPapers()).forEach(p=>
-    p.questions.forEach(q=>{ if(store.wrong[qkey(p.id,q.no)]) out.push({pid:p.id, no:q.no}); }));
+  sets.forEach(s=> s.questions.forEach(q=>{ if(store.wrong[qkey(s.id,q.no)]) out.push({pid:s.id, no:q.no}); }));
   return out;
 }
 function curItem(){
@@ -1445,9 +1450,9 @@ function renderExamResult(){
    错题本
    ===================================================================== */
 function renderWrong(){
-  const groups = allPapers().map(p=>{
-    const qs = p.questions.filter(q=>store.wrong[qkey(p.id,q.no)]);
-    return {p, qs};
+  const groups = allSets().map(s=>{
+    const qs = s.questions.filter(q=>store.wrong[qkey(s.id,q.no)]);
+    return {p:s, qs};
   }).filter(g=>g.qs.length);
   const total = groups.reduce((a,g)=>a+g.qs.length,0);
 
@@ -2083,9 +2088,10 @@ function renderChapters(){
   const cards = CHAPTERS.map(c=>{
     const tq = c.questions.length;
     const we = c.questions.filter(q=>q.explain).length;
+    const wc = c.questions.filter(q=>store.wrong[qkey(c.id,q.no)]).length;
     return `<div class="card paperpick" onclick="route({name:'chapter',cid:'${c.id}'})">
       <span class="pp-ico">📘</span>
-      <span class="pp-txt"><b>${esc(c.title)}</b><span class="dim">${tq} 题 · 含解析 ${we}/${tq}</span></span>
+      <span class="pp-txt"><b>${esc(c.title)}</b><span class="dim">${tq} 题 · 含解析 ${we}/${tq}${wc?' · <span style="color:var(--bad)">错题 '+wc+'</span>':''}</span></span>
       <span class="pp-arrow">›</span>
     </div>`;
   }).join('');
@@ -2101,12 +2107,13 @@ function renderChapter(cid){
   if(!c){ route({name:'chapters'}); return; }
   const tq = c.questions.length;
   const we = c.questions.filter(q=>q.explain).length;
+  const wc = c.questions.filter(q=>store.wrong[qkey(c.id,q.no)]).length;
   $('#app').innerHTML = `
     <div class="qhead"><button class="btn g sm" onclick="route({name:'chapters'})">← 章节列表</button>
       <span class="badge" style="background:var(--primary-soft);color:var(--primary)">章节练习</span></div>
     <div class="card" style="margin-top:12px">
       <h2 style="margin:0 0 6px">${esc(c.title)}</h2>
-      <div class="muted">本章共 ${tq} 题 · 全部有答案 · 含解析 ${we} 题</div>
+      <div class="muted">本章共 ${tq} 题 · 全部有答案 · 含解析 ${we} 题${wc?' · <span style="color:var(--bad)">错题本 '+wc+' 题</span>':''}</div>
       <div class="btnrow" style="margin-top:18px;flex-wrap:wrap">
         <button class="btn p" onclick="route({name:'chapterPractice',cid:'${c.id}',mode:'seq',index:0})">📝 顺序练习（逐题判分）</button>
         <button class="btn p" style="background:#d97706" onclick="route({name:'chapterMemo',cid:'${c.id}',index:0})">📖 背题模式（直接给答案）</button>
@@ -2205,6 +2212,12 @@ function chapterPick(L){
   if(store.records[k]) return;
   const correct = L===q.answer;
   store.records[k] = {picked:L, correct, ts:Date.now()};
+  /* 章节复习的错题也纳入错题本：答错入册，重做答对移出 */
+  if(correct){
+    if(store.wrong[k]){ delete store.wrong[k]; }
+  }else{
+    store.wrong[k] = {ts:Date.now()};
+  }
   save(); renderChapterPractice();
 }
 function goChapter(d){
